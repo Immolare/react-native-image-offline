@@ -73,12 +73,11 @@ class OfflineImageStore {
 
       // Remove Expired images from offline store and then call user given callback completion method !
       this._removeExpiredImages(onRestoreCompletion);
-    }).then(data => {
-      console.log(data);
-    }, err => {
-      console.log('Fetch Error: ', err);
+    }).catch ((err) => {
+      if (this.store.debugMode) {
+        console.log('getItem error', err);
+      }
     });
-
   };
 
   /**
