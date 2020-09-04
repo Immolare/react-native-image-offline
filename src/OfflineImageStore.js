@@ -62,22 +62,22 @@ class OfflineImageStore {
       this.store.debugMode = true;
     }
 
-    // Restore existing entries:
-    AsyncStorage.getItem(`@${this.store.name}:uris`, (err, uris) => { // On `getItems` completion
+    try {
+      // Restore existing entries:
+      const uris = await AsyncStorage.getItem(`@${this.store.name}:uris`);
+      if (uris !== null) {
+        if (this.store.debugMode) {
+          console.log('Restored offline images entry dictionary');
+        }
+        // Assign uris to entry list cache(`this.entries`)
+        Object.assign(this.entries, JSON.parse(uris));
 
-      if (this.store.debugMode) {
-        console.log('Restored offline images entry dictionary');
+        // Remove Expired images from offline store and then call user given callback completion method !
+        this._removeExpiredImages(onRestoreCompletion);
       }
-      // Assign uris to entry list cache(`this.entries`)
-      Object.assign(this.entries, JSON.parse(uris));
-
-      // Remove Expired images from offline store and then call user given callback completion method !
-      this._removeExpiredImages(onRestoreCompletion);
-    }).catch ((err) => {
-      if (this.store.debugMode) {
-        console.log('getItem error', err);
-      }
-    });
+    } catch (err) {
+      console.error("Error getItem:", err);
+    }
   };
 
   /**
@@ -242,12 +242,14 @@ class OfflineImageStore {
   /**
    * Update AsyncStorage with entries cache and trigger callback.
    */
-  _updateAsyncStorage = (onRestoreCompletionCallback) => {
-    AsyncStorage.setItem(`@${this.store.name}:uris`, JSON.stringify(this.entries), (err) => {
+  _updateAsyncStorage = async (onRestoreCompletionCallback) => {
+    try {
+      await AsyncStorage.setItem(`@${this.store.name}:uris`, JSON.stringify(this.entries));
+    } catch (err) {
       if (onRestoreCompletionCallback) {
         err ? onRestoreCompletionCallback(err) : onRestoreCompletionCallback();
       }
-    });
+    }
   };
 
   getImageOfflinePath = (uri) => {
