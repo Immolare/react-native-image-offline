@@ -62,7 +62,23 @@ class OfflineImageStore {
       this.store.debugMode = true;
     }
 
-    try {
+    // Restore existing entries:
+    AsyncStorage.getItem(`@${this.store.name}:uris`, (err, uris) => { // On `getItems` completion
+
+      if (this.store.debugMode) {
+        console.log('Restored offline images entry dictionary');
+      }
+      // Assign uris to entry list cache(`this.entries`)
+      Object.assign(this.entries, JSON.parse(uris));
+
+      // Add offline config, do not delete expired images in offline mode
+      if (config.isOffline) return onRestoreCompletion();
+
+      // Remove Expired images from offline store and then call user given callback completion method !
+      this._removeExpiredImages(onRestoreCompletion);
+    });
+
+    /*try {
       // Restore existing entries:
       const uris = await AsyncStorage.getItem(`@${this.store.name}:uris`);
       if (uris !== null) {
@@ -77,7 +93,7 @@ class OfflineImageStore {
       }
     } catch (err) {
       console.error("Error getItem:", err);
-    }
+    }*/
   };
 
   /**
@@ -242,7 +258,14 @@ class OfflineImageStore {
   /**
    * Update AsyncStorage with entries cache and trigger callback.
    */
-  _updateAsyncStorage = async (onRestoreCompletionCallback) => {
+  _updateAsyncStorage = (onRestoreCompletionCallback) => {
+    AsyncStorage.setItem(`@${this.store.name}:uris`, JSON.stringify(this.entries), (err) => {
+      if (onRestoreCompletionCallback) {
+        err ? onRestoreCompletionCallback(err) : onRestoreCompletionCallback();
+      }
+    });
+  };
+  /*_updateAsyncStorage = async (onRestoreCompletionCallback) => {
     try {
       await AsyncStorage.setItem(`@${this.store.name}:uris`, JSON.stringify(this.entries));
     } catch (err) {
@@ -250,7 +273,7 @@ class OfflineImageStore {
         err ? onRestoreCompletionCallback(err) : onRestoreCompletionCallback();
       }
     }
-  };
+  };*/
 
   getImageOfflinePath = (uri) => {
     if (this.entries[uri]) {
@@ -311,16 +334,22 @@ class OfflineImageStore {
         path: this.getBaseDir() + '/' + imageFilePath
       })
       .fetch(method, source.uri, source.headers)
-      .then(() => {
-        // Add entry to entry list!!
-        this._addEntry(source.uri, imageFilePath);
-        // Notify subscribed handler AND Persist entries to AsyncStorage for offline
-        this._updateOfflineStore(source.uri).done();
+      .then((res) => {
+        if (res.respInfo.status === 200) {
+          // Add entry to entry list!!
+          this._addEntry(source.uri, imageFilePath);
+          // Notify subscribed handler AND Persist entries to AsyncStorage for offline
+          this._updateOfflineStore(source.uri).done();
+          return
+        }
+        if (this.store.debugMode) {
+          console.log('donwload image error', res)
+        }
         return null;
       }).catch(() => {
-      if (this.store.debugMode) {
-        console.log('Failed to download image', source.uri);
-      }
+        if (this.store.debugMode) {
+          console.log('Failed to download image', source.uri);
+        }
     });
   };
 
